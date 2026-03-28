@@ -291,4 +291,3 @@ class CodeCarbonStats(base.TrainerStats):
                 "loss": loss.to(torch.device("cpu"), non_blocking=True),
             }
         )
-

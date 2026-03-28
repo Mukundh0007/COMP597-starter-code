@@ -140,4 +140,3 @@ class SimpleTrainerStats(base.TrainerStats):
 
     def log_loss(self, loss : torch.Tensor) -> None:
         pass
-

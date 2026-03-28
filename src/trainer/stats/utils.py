@@ -254,4 +254,3 @@ class RunningEnergy:
 
         """
         self.stat.log_analysis()
-
