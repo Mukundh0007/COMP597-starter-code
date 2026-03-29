@@ -9,10 +9,10 @@ ${SCRIPTS_DIR}/srun.sh \
     --model bert \
     --data bert \
     --trainer simple \
-    --batch_size 32 \
+    --batch_size 8 \
     --learning_rate 1e-4 \
     --trainer_stats simple \
-    --data_configs.bert.repeat 750 \
+    --data_configs.bert.repeat 2000 \
     --data_configs.bert.n 0
 
 ### BERT with CodeCarbon (power/energy for workload evaluation)
