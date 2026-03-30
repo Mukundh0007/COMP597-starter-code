@@ -1,0 +1,2 @@
+num_steps,step_mean_s,step_std_s,forward_mean_s,forward_std_s,backward_mean_s,backward_std_s,optimizer_mean_s,optimizer_std_s
+528,0.556573,0.005546,0.184751,0.003516,0.352212,0.002582,0.019211,0.000958

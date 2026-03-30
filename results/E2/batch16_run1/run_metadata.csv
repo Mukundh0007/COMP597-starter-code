@@ -1,0 +1,2 @@
+batch_size,repeat,run,trainer_stats,train_time_s,wall_clock_s,steps,target_seconds,e1_avg_s,overhead_pct,within_5pct,codecarbon_output_dir
+16,1100,1,codecarbon_v2,300.14,561.3897,1022,300,300.1833,-0.0144,yes,/home/2026/mjayap/COMP597-starter-code/results/E2/batch16_run1/codecarbon

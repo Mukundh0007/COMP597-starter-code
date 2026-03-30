@@ -1,0 +1,10 @@
+timestamp,batch_size,repeat,run,wall_clock_s,train_time_s,steps,e1_avg_s,overhead_pct,within_5pct,codecarbon_dir,log_file
+2026-03-29T10:33:43-04:00,32,550,1,311.8659,300.19,538,300.2300,-0.0133,yes,/home/2026/mjayap/COMP597-starter-code/results/E2/batch32_run1/codecarbon,/home/2026/mjayap/COMP597-starter-code/results/E2/logs/batch32_run1.log
+2026-03-29T10:39:55-04:00,32,550,2,312.2855,300.35,537,300.2300,0.0400,yes,/home/2026/mjayap/COMP597-starter-code/results/E2/batch32_run2/codecarbon,/home/2026/mjayap/COMP597-starter-code/results/E2/logs/batch32_run2.log
+2026-03-29T10:50:31-04:00,32,550,3,576.1531,300.48,528,300.2300,0.0833,yes,/home/2026/mjayap/COMP597-starter-code/results/E2/batch32_run3/codecarbon,/home/2026/mjayap/COMP597-starter-code/results/E2/logs/batch32_run3.log
+2026-03-29T11:00:53-04:00,16,1100,1,561.3897,300.14,1022,300.1833,-0.0144,yes,/home/2026/mjayap/COMP597-starter-code/results/E2/batch16_run1/codecarbon,/home/2026/mjayap/COMP597-starter-code/results/E2/logs/batch16_run1.log
+2026-03-29T11:11:16-04:00,16,1100,2,561.9464,300.08,1028,300.1833,-0.0344,yes,/home/2026/mjayap/COMP597-starter-code/results/E2/batch16_run2/codecarbon,/home/2026/mjayap/COMP597-starter-code/results/E2/logs/batch16_run2.log
+2026-03-29T11:21:38-04:00,16,1100,3,562.3099,300.22,1024,300.1833,0.0122,yes,/home/2026/mjayap/COMP597-starter-code/results/E2/batch16_run3/codecarbon,/home/2026/mjayap/COMP597-starter-code/results/E2/logs/batch16_run3.log
+2026-03-29T11:32:00-04:00,8,2000,1,561.3772,300.10,1904,300.1267,-0.0089,yes,/home/2026/mjayap/COMP597-starter-code/results/E2/batch8_run1/codecarbon,/home/2026/mjayap/COMP597-starter-code/results/E2/logs/batch8_run1.log
+2026-03-29T11:42:24-04:00,8,2000,2,562.7200,300.06,1909,300.1267,-0.0222,yes,/home/2026/mjayap/COMP597-starter-code/results/E2/batch8_run2/codecarbon,/home/2026/mjayap/COMP597-starter-code/results/E2/logs/batch8_run2.log
+2026-03-29T11:52:45-04:00,8,2000,3,560.8322,300.11,1908,300.1267,-0.0056,yes,/home/2026/mjayap/COMP597-starter-code/results/E2/batch8_run3/codecarbon,/home/2026/mjayap/COMP597-starter-code/results/E2/logs/batch8_run3.log

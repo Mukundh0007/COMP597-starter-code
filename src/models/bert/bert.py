@@ -67,6 +67,7 @@ class BertTrainerStats(simple_stats.SimpleTrainerStats):
         self.gpu_util_pct = []
         self.gpu_mem_util_pct = []
         self.gpu_mem_mb = []
+        self.cpu_util_pct = []
         self.sys_mem_pct = []
         self.sys_mem_mb = []
         self.throughput_samp_per_s = []
@@ -130,13 +131,16 @@ class BertTrainerStats(simple_stats.SimpleTrainerStats):
             self.gpu_mem_util_pct.append(-1)
         if self._psutil_ok:
             try:
+                self.cpu_util_pct.append(psutil.cpu_percent(interval=None))
                 vmem = psutil.virtual_memory()
                 self.sys_mem_pct.append(vmem.percent)
                 self.sys_mem_mb.append(vmem.used / (1024 ** 2))
             except Exception:
+                self.cpu_util_pct.append(-1)
                 self.sys_mem_pct.append(-1)
                 self.sys_mem_mb.append(-1.0)
         else:
+            self.cpu_util_pct.append(-1)
             self.sys_mem_pct.append(-1)
             self.sys_mem_mb.append(-1.0)
 
@@ -170,11 +174,11 @@ class BertTrainerStats(simple_stats.SimpleTrainerStats):
         timeline_csv_path = os.path.join(self.output_dir, "bert_run_timeline.csv")
         tn = len(self.timeline_s)
         with open(timeline_csv_path, "w") as f:
-            f.write("timeline_s,gpu_util_pct,gpu_mem_util_pct,gpu_mem_mb,sys_mem_pct,sys_mem_mb\n")
+            f.write("timeline_s,gpu_util_pct,gpu_mem_util_pct,gpu_mem_mb,cpu_util_pct,sys_mem_pct,sys_mem_mb\n")
             for i in range(tn):
                 f.write(
                     f"{self.timeline_s[i]:.4f},{self.gpu_util_pct[i]},{self.gpu_mem_util_pct[i]},"
-                    f"{self.gpu_mem_mb[i]:.2f},{self.sys_mem_pct[i]},{self.sys_mem_mb[i]:.2f}\n"
+                    f"{self.gpu_mem_mb[i]:.2f},{self.cpu_util_pct[i]},{self.sys_mem_pct[i]},{self.sys_mem_mb[i]:.2f}\n"
                 )
         print(f"BERT results written to {csv_path}")
         print(f"BERT timeline written to {timeline_csv_path}")
@@ -264,7 +268,7 @@ class BertTrainerStats(simple_stats.SimpleTrainerStats):
 class BertSimpleTrainer(trainer.SimpleTrainer):
     """SimpleTrainer with 5-minute time-bounded training loop."""
 
-    MAX_DURATION_S = 5 * 60  # 5 minutes per experiment protocol
+    MAX_DURATION_S = 5*60  #5 minutes per experiment protocol
 
     def forward(self, i, batch, model_kwargs):
         self.optimizer.zero_grad()
@@ -347,7 +351,12 @@ def simple_trainer(conf, model, dataset, tokenizer, data_collator):
 
     # Use BertTrainerStats for loss + timing + GPU util/memory/throughput + plots; use codecarbon for power/energy.
     if getattr(conf, "trainer_stats", "simple") == "simple":
-        stats = BertTrainerStats(device=model.device, batch_size=conf.batch_size)
+        stats_output_dir = os.environ.get("BERT_STATS_OUTPUT_DIR")
+        stats = BertTrainerStats(
+            device=model.device,
+            batch_size=conf.batch_size,
+            output_dir=stats_output_dir,
+        )
     else:
         stats = trainer_stats.init_from_conf(conf=conf, device=model.device, num_train_steps=len(loader))
 

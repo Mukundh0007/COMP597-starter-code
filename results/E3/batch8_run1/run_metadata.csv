@@ -1,0 +1,2 @@
+batch_size,repeat,run,trainer_stats,train_time_s,wall_clock_s,steps,target_seconds,results_csv,timeline_csv
+8,2000,1,simple,300.04,562.0408,1879,300,/home/2026/mjayap/COMP597-starter-code/results/E3/batch8_run1/metrics/bert_run_results.csv,/home/2026/mjayap/COMP597-starter-code/results/E3/batch8_run1/metrics/bert_run_timeline.csv
