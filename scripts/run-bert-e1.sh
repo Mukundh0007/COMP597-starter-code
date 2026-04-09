@@ -8,9 +8,10 @@ REPO_DIR=$(readlink -f -n "${SCRIPTS_DIR}/..")
 # Fixed pairs provided by user for approximately 5-minute runs.
 BATCH_SIZES=(32 16 8)
 RUNS_PER_BATCH=${E1_RUNS_PER_BATCH:-3}
-COOLDOWN_S=${E1_COOLDOWN_S:-60}
+COOLDOWN_S=${E1_COOLDOWN_S:-10}
+BERT_SEED=${BERT_SEED:-42}
 
-RESULTS_DIR="${REPO_DIR}/results/E1"
+RESULTS_DIR="${REPO_DIR}/results/E1_step3"
 LOG_DIR="${RESULTS_DIR}/logs"
 mkdir -p "${RESULTS_DIR}" "${LOG_DIR}"
 
@@ -33,6 +34,7 @@ run_e1_command() {
         --batch_size "${batch_size}" \
         --learning_rate 1e-4 \
         --trainer_stats noop \
+        --data_configs.bert.seed "${BERT_SEED}" \
         --data_configs.bert.repeat "${repeat_val}" \
         --data_configs.bert.n 0
 }

@@ -9,3 +9,4 @@ class DataConfig(_BaseConfig):
         self._arg_train_length = _Arg(type=int, help="Sequence length (train_length, like milabench).", default=512)
         self._arg_n = _Arg(type=int, help="Number of unique synthetic samples (milabench n). 0 => use batch_size.", default=0)
         self._arg_repeat = _Arg(type=int, help="Repeat factor: dataset length = n * repeat (milabench repeat). Use 100000 for full milabench-length run.", default=100000)
+        self._arg_seed = _Arg(type=int, help="Random seed for synthetic sample generation and BERT MLM masking/model init reproducibility.", default=42)

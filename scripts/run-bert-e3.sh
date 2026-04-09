@@ -7,10 +7,11 @@ REPO_DIR=$(readlink -f -n "${SCRIPTS_DIR}/..")
 # E3 protocol defaults.
 BATCH_SIZES=(32 16 8)
 RUNS_PER_BATCH=${E3_RUNS_PER_BATCH:-3}
-COOLDOWN_S=${E3_COOLDOWN_S:-60}
+COOLDOWN_S=${E3_COOLDOWN_S:-20}
 TARGET_SECONDS=${E3_TARGET_SECONDS:-300}
+BERT_SEED=${BERT_SEED:-42}
 
-RESULTS_DIR="${REPO_DIR}/results/E3"
+RESULTS_DIR="${REPO_DIR}/results/E3_step3"
 LOG_DIR="${RESULTS_DIR}/logs"
 mkdir -p "${RESULTS_DIR}" "${LOG_DIR}"
 
@@ -27,7 +28,10 @@ run_e3_command() {
     local repeat_val="$2"
     local output_dir="$3"
 
-    BERT_STATS_OUTPUT_DIR="${output_dir}" "${SCRIPTS_DIR}/srun.sh" \
+    BERT_STATS_OUTPUT_DIR="${output_dir}" \
+    BERT_SYNC_EVERY_STEPS="${BERT_SYNC_EVERY_STEPS:-3}" \
+    BERT_METRICS_INTERVAL_S="${BERT_METRICS_INTERVAL_S:-0.5}" \
+    "${SCRIPTS_DIR}/srun.sh" \
         --logging.level INFO \
         --model bert \
         --data bert \
@@ -35,6 +39,7 @@ run_e3_command() {
         --batch_size "${batch_size}" \
         --learning_rate 1e-4 \
         --trainer_stats simple \
+        --data_configs.bert.seed "${BERT_SEED}" \
         --data_configs.bert.repeat "${repeat_val}" \
         --data_configs.bert.n 0
 }
@@ -63,6 +68,22 @@ calc_std() {
         if (v < 0) v = 0;
         printf "%.4f", sqrt(v)
     }'
+}
+
+wait_for_file() {
+    local path="$1"
+    local timeout_s="${2:-30}"
+    local waited=0
+
+    while (( waited < timeout_s )); do
+        if [[ -f "${path}" && -s "${path}" ]]; then
+            return 0
+        fi
+        sleep 1
+        waited=$((waited + 1))
+    done
+
+    return 1
 }
 
 aggregate_phase_summary() {
@@ -145,23 +166,31 @@ aggregate_timeline_summary() {
             gpu_sum[t] += $2; gpu_sq[t] += ($2 * $2)
             gpumem_sum[t] += $4; gpumem_sq[t] += ($4 * $4)
             cpu_sum[t] += $5; cpu_sq[t] += ($5 * $5)
+            e_delta_sum[t] += $8; e_delta_sq[t] += ($8 * $8)
+            power_sum[t] += $10; power_sq[t] += ($10 * $10)
         }
         END {
-            print "timeline_s,gpu_util_pct_mean,gpu_util_pct_std,gpu_mem_mb_mean,gpu_mem_mb_std,cpu_util_pct_mean,cpu_util_pct_std,num_samples"
+            print "timeline_s,gpu_util_pct_mean,gpu_util_pct_std,gpu_mem_mb_mean,gpu_mem_mb_std,cpu_util_pct_mean,cpu_util_pct_std,gpu_energy_delta_j_mean,gpu_energy_delta_j_std,gpu_power_w_mean,gpu_power_w_std,num_samples"
             for (t in n) {
                 gpu_mean = gpu_sum[t] / n[t]
                 gpumem_mean = gpumem_sum[t] / n[t]
                 cpu_mean = cpu_sum[t] / n[t]
+                e_delta_mean = e_delta_sum[t] / n[t]
+                power_mean = power_sum[t] / n[t]
 
                 gpu_std = sqrt((gpu_sq[t] / n[t]) - (gpu_mean * gpu_mean))
                 gpumem_std = sqrt((gpumem_sq[t] / n[t]) - (gpumem_mean * gpumem_mean))
                 cpu_std = sqrt((cpu_sq[t] / n[t]) - (cpu_mean * cpu_mean))
+                e_delta_std = sqrt((e_delta_sq[t] / n[t]) - (e_delta_mean * e_delta_mean))
+                power_std = sqrt((power_sq[t] / n[t]) - (power_mean * power_mean))
 
                 if (gpu_std < 0) gpu_std = 0
                 if (gpumem_std < 0) gpumem_std = 0
                 if (cpu_std < 0) cpu_std = 0
+                if (e_delta_std < 0) e_delta_std = 0
+                if (power_std < 0) power_std = 0
 
-                printf "%.1f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%d\n", t, gpu_mean, gpu_std, gpumem_mean, gpumem_std, cpu_mean, cpu_std, n[t]
+                printf "%.1f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%d\n", t, gpu_mean, gpu_std, gpumem_mean, gpumem_std, cpu_mean, cpu_std, e_delta_mean, e_delta_std, power_mean, power_std, n[t]
             }
         }
     ' "${files[@]}" > "${tmp_unsorted}"
@@ -220,12 +249,16 @@ for batch_size in "${BATCH_SIZES[@]}"; do
         results_csv="${metrics_dir}/bert_run_results.csv"
         timeline_csv="${metrics_dir}/bert_run_timeline.csv"
 
-        if [[ ! -f "${results_csv}" ]]; then
-            echo "[E3] Missing ${results_csv}" >&2
+        if ! wait_for_file "${results_csv}" 45; then
+            echo "[E3] Missing or empty after wait: ${results_csv}" >&2
+            echo "[E3] Metrics dir listing for debug:" >&2
+            ls -lah "${metrics_dir}" >&2 || true
             exit 1
         fi
-        if [[ ! -f "${timeline_csv}" ]]; then
-            echo "[E3] Missing ${timeline_csv}" >&2
+        if ! wait_for_file "${timeline_csv}" 45; then
+            echo "[E3] Missing or empty after wait: ${timeline_csv}" >&2
+            echo "[E3] Metrics dir listing for debug:" >&2
+            ls -lah "${metrics_dir}" >&2 || true
             exit 1
         fi
 

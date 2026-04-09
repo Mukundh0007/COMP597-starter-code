@@ -3,8 +3,9 @@ CodeCarbon v2: Minimal end-to-end energy tracking for E2.
 
 This implementation tracks ONLY full-run energy consumption with minimal overhead:
 - Single OfflineEmissionsTracker for total training duration
-- No per-step or per-substep task tracking
-- Minimal CUDA synchronization (start/stop of full run only)
+- No per-step or per-substep energy task tracking
+- Sampled phase timing with synchronization every N steps (default: 5)
+- CodeCarbon power sampling at 500ms cadence by default
 - Single CSV output at end
 - <5% overhead target vs E1 baseline (no-op)
 
@@ -42,7 +43,9 @@ def construct_trainer_stats(conf: config.Config, **kwargs) -> base.TrainerStats:
         device, 
         conf.trainer_stats_configs.codecarbon_v2.run_num, 
         conf.trainer_stats_configs.codecarbon_v2.project_name, 
-        conf.trainer_stats_configs.codecarbon_v2.output_dir
+        conf.trainer_stats_configs.codecarbon_v2.output_dir,
+        conf.trainer_stats_configs.codecarbon_v2.sync_every_steps,
+        conf.trainer_stats_configs.codecarbon_v2.measure_power_secs,
     )
 
 
@@ -122,12 +125,22 @@ class CodeCarbonStatsV2(base.TrainerStats):
         Directory for outputs (cc_full_rank_*.csv).
     """
 
-    def __init__(self, device: torch.device, run_num: int, project_name: str, output_dir: str) -> None:
+    def __init__(
+        self,
+        device: torch.device,
+        run_num: int,
+        project_name: str,
+        output_dir: str,
+        sync_every_steps: int = 5,
+        measure_power_secs: float = 0.5,
+    ) -> None:
         self.device = device
         self.run_num = run_num
         self.project_name = project_name
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
+        self.sync_every_steps = max(1, int(sync_every_steps))
+        self.measure_power_secs = max(0.5, float(measure_power_secs))
 
         self._gpu_id = self.device.index if self.device.index is not None else 0
 
@@ -140,6 +153,7 @@ class CodeCarbonStatsV2(base.TrainerStats):
         # Current-row state
         self._current_step = 0
         self._current_loss = None
+        self._timing_enabled_this_step = False
 
         # Per-step timing rows (single flush at end)
         self._rows = []
@@ -161,11 +175,13 @@ class CodeCarbonStatsV2(base.TrainerStats):
             allow_multiple_runs=True,
             log_level="warning",
             gpu_ids=[self._gpu_id],
+            measure_power_secs=self.measure_power_secs,
         )
 
         logger.info(
             f"CodeCarbonStatsV2 initialized: run_num={run_num}, project={project_name}, "
-            f"output_dir={output_dir}, gpu_id={self._gpu_id}"
+            f"output_dir={output_dir}, gpu_id={self._gpu_id}, sync_every_steps={self.sync_every_steps}, "
+            f"measure_power_secs={self.measure_power_secs}"
         )
 
     def _sync(self) -> None:
@@ -222,36 +238,45 @@ class CodeCarbonStatsV2(base.TrainerStats):
 
     def start_step(self) -> None:
         self._current_step += 1
-        self._sync()
-        self.step_stats.start()
+        self._timing_enabled_this_step = (self._current_step % self.sync_every_steps) == 0
+        if self._timing_enabled_this_step:
+            self._sync()
+            self.step_stats.start()
 
     def stop_step(self) -> None:
-        self._sync()
-        self.step_stats.stop()
+        if self._timing_enabled_this_step:
+            self._sync()
+            self.step_stats.stop()
 
     def start_forward(self) -> None:
-        self._sync()
-        self.forward_stats.start()
+        if self._timing_enabled_this_step:
+            self._sync()
+            self.forward_stats.start()
 
     def stop_forward(self) -> None:
-        self._sync()
-        self.forward_stats.stop()
+        if self._timing_enabled_this_step:
+            self._sync()
+            self.forward_stats.stop()
 
     def start_backward(self) -> None:
-        self._sync()
-        self.backward_stats.start()
+        if self._timing_enabled_this_step:
+            self._sync()
+            self.backward_stats.start()
 
     def stop_backward(self) -> None:
-        self._sync()
-        self.backward_stats.stop()
+        if self._timing_enabled_this_step:
+            self._sync()
+            self.backward_stats.stop()
 
     def start_optimizer_step(self) -> None:
-        self._sync()
-        self.optimizer_step_stats.start()
+        if self._timing_enabled_this_step:
+            self._sync()
+            self.optimizer_step_stats.start()
 
     def stop_optimizer_step(self) -> None:
-        self._sync()
-        self.optimizer_step_stats.stop()
+        if self._timing_enabled_this_step:
+            self._sync()
+            self.optimizer_step_stats.stop()
 
     def start_save_checkpoint(self) -> None:
         """E2 does not instrument checkpoint saves."""
@@ -262,6 +287,9 @@ class CodeCarbonStatsV2(base.TrainerStats):
         pass
 
     def log_step(self) -> None:
+        if not self._timing_enabled_this_step:
+            return
+
         step_s = self.step_stats.get_last() / 1e9
         forward_s = self.forward_stats.get_last() / 1e9
         backward_s = self.backward_stats.get_last() / 1e9
@@ -282,13 +310,8 @@ class CodeCarbonStatsV2(base.TrainerStats):
         )
 
     def log_loss(self, loss: torch.Tensor) -> None:
-        if loss is None:
-            self._current_loss = None
-            return
-        if isinstance(loss, torch.Tensor):
-            self._current_loss = loss.detach().item()
-        else:
-            self._current_loss = float(loss)
+        # E2 minimizes synchronization overhead; loss logging is intentionally disabled.
+        self._current_loss = None
 
     def log_stats(self) -> None:
         """E2 final logging: persist per-step timing CSVs and full-run energy output."""

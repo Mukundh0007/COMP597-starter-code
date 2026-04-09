@@ -15,11 +15,13 @@ import src.config as config
 data_load_name = "bert"
 
 
-def _make_generators(vocab_size: int, train_length: int):
+def _make_generators(vocab_size: int, train_length: int, rng: torch.Generator = None):
     """Generators for MaskedLM-style synthetic data (milabench gen_AutoModelForMaskedLM)."""
 
     def gen_input_ids():
-        return torch.randint(0, vocab_size, (train_length,), dtype=torch.long)
+        if rng is None:
+            return torch.randint(0, vocab_size, (train_length,), dtype=torch.long)
+        return torch.randint(0, vocab_size, (train_length,), dtype=torch.long, generator=rng)
 
     def gen_attention_mask():
         return torch.ones(train_length, dtype=torch.long)
@@ -63,6 +65,7 @@ def load_data(conf: config.Config) -> data.Dataset:
     train_length = 512
     n = 4
     repeat = 100000 #needs to change as required
+    seed = 42
 
     if hasattr(conf, "data_configs") and hasattr(conf.data_configs, "bert"):
         b = conf.data_configs.bert
@@ -70,8 +73,12 @@ def load_data(conf: config.Config) -> data.Dataset:
         train_length = getattr(b, "train_length", train_length)
         n = getattr(b, "n", n)
         repeat = getattr(b, "repeat", repeat)
+        seed = getattr(b, "seed", seed)
     if n <= 0:
         n = getattr(conf, "batch_size", 4)
-    print(n)
-    generators = _make_generators(vocab_size, train_length)
+
+    rng = torch.Generator()
+    rng.manual_seed(int(seed))
+
+    generators = _make_generators(vocab_size, train_length, rng=rng)
     return SyntheticData(generators=generators, n=n, repeat=repeat)

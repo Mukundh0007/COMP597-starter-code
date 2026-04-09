@@ -60,9 +60,8 @@ export COMP597_SLURM_PARTITION="all"
 # See --qos in srun --help
 export COMP597_SLURM_QOS="comp597"
 # The maximum amount of time the job is allowed to run for.
-# Format is [[hours:]minutes:]seconds — use 5:00:00 for 5 hours, 6:00:00 for 6h (course max).
 # See --time in srun --help
-export COMP597_SLURM_TIME_LIMIT="5:00:00"
+export COMP597_SLURM_TIME_LIMIT="5:00"
 
 ################################################################################
 ################################################################################

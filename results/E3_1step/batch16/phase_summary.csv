@@ -1,0 +1,5 @@
+batch_size,phase,mean_s,std_s,num_samples
+16,step,0.279457,0.003999,3094
+16,forward,0.087031,0.002761,3094
+16,backward,0.172882,0.001094,3094
+16,optimizer,0.019168,0.000672,3094

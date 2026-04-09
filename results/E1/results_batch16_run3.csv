@@ -1,2 +1,2 @@
 batch_size,repeat,run,trainer_stats,train_time_s,wall_clock_s,steps,note
-16,1100,3,noop,300.28,310.4767,1042,E1 baseline run without per-step instrumentation
+16,1100,3,noop,300.14,310.3726,1068,E1 baseline run without per-step instrumentation

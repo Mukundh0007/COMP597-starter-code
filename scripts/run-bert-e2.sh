@@ -7,11 +7,12 @@ REPO_DIR=$(readlink -f -n "${SCRIPTS_DIR}/..")
 # E2 uses the same batch/repeat pairs as E1.
 BATCH_SIZES=(32 16 8)
 RUNS_PER_BATCH=${E2_RUNS_PER_BATCH:-3}
-COOLDOWN_S=${E2_COOLDOWN_S:-60}
+COOLDOWN_S=${E2_COOLDOWN_S:-20}
 TARGET_SECONDS=${E2_TARGET_SECONDS:-300}
-E1_SUMMARY_CSV="${REPO_DIR}/results/E1/e1_time_summary.csv"
+BERT_SEED=${BERT_SEED:-42}
+E1_SUMMARY_CSV="${REPO_DIR}/results/E1_step3/e1_time_summary.csv"
 
-RESULTS_DIR="${REPO_DIR}/results/E2"
+RESULTS_DIR="${REPO_DIR}/results/E2_step3"
 LOG_DIR="${RESULTS_DIR}/logs"
 mkdir -p "${RESULTS_DIR}" "${LOG_DIR}"
 
@@ -41,6 +42,9 @@ run_e2_command() {
         --trainer_stats_configs.codecarbon_v2.run_num "${run_num}" \
         --trainer_stats_configs.codecarbon_v2.project_name "${project_name}" \
         --trainer_stats_configs.codecarbon_v2.output_dir "${output_dir}" \
+        --trainer_stats_configs.codecarbon_v2.sync_every_steps 3 \
+        --trainer_stats_configs.codecarbon_v2.measure_power_secs 0.5 \
+        --data_configs.bert.seed "${BERT_SEED}" \
         --data_configs.bert.repeat "${repeat_val}" \
         --data_configs.bert.n 0
 }
@@ -133,7 +137,7 @@ for batch_size in "${BATCH_SIZES[@]}"; do
         start_ns=$(date +%s%N)
         {
             echo "[E2] Command start: $(date -Iseconds)"
-        echo "[E2] Command: ${SCRIPTS_DIR}/srun.sh --logging.level INFO --model bert --data bert --trainer simple --batch_size ${batch_size} --learning_rate 1e-4 --trainer_stats codecarbon_v2 --trainer_stats_configs.codecarbon_v2.run_num ${run} --trainer_stats_configs.codecarbon_v2.project_name ${project_name} --trainer_stats_configs.codecarbon_v2.output_dir ${run_codecarbon_dir} --data_configs.bert.repeat ${repeat_val} --data_configs.bert.n 0"
+        echo "[E2] Command: ${SCRIPTS_DIR}/srun.sh --logging.level INFO --model bert --data bert --trainer simple --batch_size ${batch_size} --learning_rate 1e-4 --trainer_stats codecarbon_v2 --trainer_stats_configs.codecarbon_v2.run_num ${run} --trainer_stats_configs.codecarbon_v2.project_name ${project_name} --trainer_stats_configs.codecarbon_v2.output_dir ${run_codecarbon_dir} --trainer_stats_configs.codecarbon_v2.sync_every_steps 5 --trainer_stats_configs.codecarbon_v2.measure_power_secs 0.5 --data_configs.bert.repeat ${repeat_val} --data_configs.bert.n 0"
             run_e2_command "${batch_size}" "${repeat_val}" "${run}" "${run_codecarbon_dir}" "${project_name}"
             echo "[E2] Command end: $(date -Iseconds)"
         } 2>&1 | tee "${log_file}"
