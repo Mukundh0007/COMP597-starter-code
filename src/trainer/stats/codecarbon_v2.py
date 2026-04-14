@@ -1,13 +1,11 @@
 """
-CodeCarbon v2: Minimal end-to-end energy tracking for E2.
-
+CodeCarbon v2: 
 This implementation tracks ONLY full-run energy consumption with minimal overhead:
 - Single OfflineEmissionsTracker for total training duration
 - No per-step or per-substep energy task tracking
 - Sampled phase timing with synchronization every N steps (default: 5)
 - CodeCarbon power sampling at 500ms cadence by default
 - Single CSV output at end
-- <5% overhead target vs E1 baseline (no-op)
 
 Protocol: E2 end-to-end energy measurement.
 """

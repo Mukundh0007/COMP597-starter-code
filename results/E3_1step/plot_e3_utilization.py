@@ -46,7 +46,27 @@ def load_timeline(path: Path):
             cpu_mean.append(_to_float(row.get("cpu_util_pct_mean", "0")))
             cpu_std.append(_to_float(row.get("cpu_util_pct_std", "0")))
 
-    return t, gpu_mean, gpu_std, cpu_mean, cpu_std
+    return {
+        "t": t,
+        "gpu_mean": gpu_mean,
+        "gpu_std": gpu_std,
+        "cpu_mean": cpu_mean,
+        "cpu_std": cpu_std,
+    }
+
+
+def band(center, std, lo=None, hi=None):
+    low, high = [], []
+    for c, s in zip(center, std):
+        l = c - s
+        h = c + s
+        if lo is not None:
+            l = max(lo, l)
+        if hi is not None:
+            h = min(hi, h)
+        low.append(l)
+        high.append(h)
+    return low, high
 
 
 def main():
@@ -63,69 +83,56 @@ def main():
             raise FileNotFoundError(f"Missing timeline summary: {csv_path}")
         timelines[bs] = load_timeline(csv_path)
 
-    # Pastel colors requested by user
-    gpu_color = "#9ecae1"   # pastel light blue
-    cpu_color = "#f4a582"   # pastel coral orange
+    # Pastel colors (match timelines theme)
+    colors = {
+        "gpu": "#9ecae1",  # pastel blue
+        "cpu": "#f4a582",  # pastel coral
+    }
 
-    fig, axes = plt.subplots(3, 2, figsize=(16, 11), sharex=False, sharey=False)
+    # ===== 2x3 GRID (ROWS = GPU/CPU, COLS = BATCH SIZE) =====
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10), sharex=False)
 
-    for row_idx, bs in enumerate(batch_sizes):
-        ax_gpu = axes[row_idx][0]
-        ax_cpu = axes[row_idx][1]
+    for col_idx, bs in enumerate(batch_sizes):
+        data = timelines[bs]
+        t = data["t"]
 
-        t, gpu_mean, gpu_std, cpu_mean, cpu_std = timelines[bs]
+        gpu_low, gpu_high = band(data["gpu_mean"], data["gpu_std"], 0, 100)
+        cpu_low, cpu_high = band(data["cpu_mean"], data["cpu_std"], 0, 100)
 
-        gpu_low = [max(0.0, m - s) for m, s in zip(gpu_mean, gpu_std)]
-        gpu_high = [min(100.0, m + s) for m, s in zip(gpu_mean, gpu_std)]
-        cpu_low = [max(0.0, m - s) for m, s in zip(cpu_mean, cpu_std)]
-        cpu_high = [min(100.0, m + s) for m, s in zip(cpu_mean, cpu_std)]
+        # GPU row (row 0)
+        ax = axes[0][col_idx]
+        ax.plot(t, data["gpu_mean"], color=colors["gpu"], lw=2)
+        ax.fill_between(t, gpu_low, gpu_high, color=colors["gpu"], alpha=0.28)
+        ax.set_ylim(90, 100.5)
+        ax.grid(alpha=0.25, linestyle=":")
+        if col_idx == 0:
+            ax.set_ylabel("GPU (%)", fontweight="bold")
+        ax.set_title(f"Batch {bs}", fontweight="bold")
 
-        ax_gpu.plot(t, gpu_mean, color=gpu_color, linewidth=2.1, label="Mean")
-        ax_gpu.fill_between(t, gpu_low, gpu_high, color=gpu_color, alpha=0.28, label="Std band")
+        # CPU row (row 1)
+        ax = axes[1][col_idx]
+        ax.plot(t, data["cpu_mean"], color=colors["cpu"], lw=2)
+        ax.fill_between(t, cpu_low, cpu_high, color=colors["cpu"], alpha=0.28)
+        ax.set_ylim(0, 3)
+        ax.grid(alpha=0.25, linestyle=":")
+        if col_idx == 0:
+            ax.set_ylabel("CPU (%)", fontweight="bold")
+        ax.set_xlabel("Time (s)", fontweight="bold")
 
-        ax_cpu.plot(t, cpu_mean, color=cpu_color, linewidth=2.1, label="Mean")
-        ax_cpu.fill_between(t, cpu_low, cpu_high, color=cpu_color, alpha=0.28, label="Std band")
-
-        ax_gpu.set_ylim(95.0, 100.5)
-        ax_cpu.set_ylim(0.0, 3.0)
-
-        if row_idx == 0:
-            ax_gpu.set_title("GPU Utilization (%)", fontweight="bold")
-            ax_cpu.set_title("CPU Utilization (%)", fontweight="bold")
-
-        ax_gpu.set_ylabel(f"Batch size {bs}\nUtilization (%)", fontweight="bold")
-        ax_cpu.set_ylabel("")
-
-        if row_idx == len(batch_sizes) - 1:
-            ax_gpu.set_xlabel("Time (s)", fontweight="bold")
-            ax_cpu.set_xlabel("Time (s)", fontweight="bold")
-        else:
-            ax_gpu.set_xlabel("")
-            ax_cpu.set_xlabel("")
-
-        ax_gpu.grid(alpha=0.25, linestyle=":")
-        ax_cpu.grid(alpha=0.25, linestyle=":")
-
-    legend_handles = [
-        plt.Line2D([0], [0], color="#5f5f5f", lw=2.1, label="Mean"),
+    # Legend
+    handles = [
+        plt.Line2D([0], [0], color="#5f5f5f", lw=2, label="Mean"),
         plt.Rectangle((0, 0), 1, 1, color="#bdbdbd", alpha=0.28, label="Std deviation"),
     ]
-    fig.legend(
-        legend_handles,
-        ["Mean", "Std deviation"],
-        loc="upper center",
-        ncol=2,
-        framealpha=0.95,
-        bbox_to_anchor=(0.5, 1.01),
-    )
+    fig.legend(handles, ["Mean", "Std deviation"], loc="upper right", ncol=2)
 
-    fig.suptitle("GPU/CPU Utilization vs Time (Mean ± Std)", fontsize=15, fontweight="bold", y=1.04)
+    fig.suptitle("GPU - CPU Utilization vs Time (Mean ± Std)", fontweight="bold")
 
-    out_png = plots_dir / "e3_cpu_gpu_utilization_mean_std.png"
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
-    fig.savefig(out_png, dpi=300, bbox_inches="tight", facecolor="white")
+    out_path = plots_dir / "e3_cpu_gpu_utilization_mean_std.png"
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=300, bbox_inches="tight")
 
-    print(f"Saved plot: {out_png}")
+    print(f"Saved: {out_path}")
 
 
 if __name__ == "__main__":
